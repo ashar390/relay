@@ -13,7 +13,7 @@ async function render() {
   );
 }
 
-test("server-renders Relay's product overview", async () => {
+test("server-renders Relay's product overview and sample job dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -22,6 +22,13 @@ test("server-renders Relay's product overview", async () => {
   assert.match(html, /<title>Relay — Background work, made understandable<\/title>/i);
   assert.match(html, /Background work/);
   assert.match(html, /One job, four simple steps/);
+  assert.match(html, /Know what every job is doing/);
+  assert.match(html, /Import customer records/);
+  assert.match(html, /Generate import report/);
+  assert.match(html, />running</i);
+  assert.match(html, />queued</i);
+  assert.match(html, />completed</i);
+  assert.match(html, />failed</i);
   assert.match(html, /Most tools tell you a job failed/);
   assert.doesNotMatch(html, /Week 1|Day 1|learning in public/i);
 });

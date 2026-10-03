@@ -26,7 +26,7 @@ Relay will demonstrate a multi-step customer import workflow:
 
 ## Status
 
-Relay is currently in its initial development stage. The repository contains the application foundation and product overview. Job processing is not implemented yet.
+Relay is currently in its initial development stage. The application includes the product overview and the first operations dashboard, which uses sample job data to establish the job model and status interface. Live job processing is not implemented yet.
 
 ## Technology direction
 

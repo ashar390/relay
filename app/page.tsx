@@ -1,3 +1,6 @@
+import { JobList } from "./components/job-list";
+import { sampleJobs } from "./lib/jobs";
+
 const stages = [
   { number: "01", title: "Submit", copy: "A website sends Relay a slow task." },
   { number: "02", title: "Queue", copy: "Relay keeps the task safe while it waits." },
@@ -44,6 +47,19 @@ export default function Home() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="dashboard" aria-labelledby="dashboard-title">
+        <div className="dashboard-heading">
+          <div>
+            <p className="label">Operations preview</p>
+            <h2 id="dashboard-title">Know what every job is doing.</h2>
+          </div>
+          <p className="dashboard-note">
+            Sample data for the first dashboard iteration. Live queue data comes next.
+          </p>
+        </div>
+        <JobList jobs={sampleJobs} />
       </section>
 
       <section className="promise" aria-labelledby="promise-title">
