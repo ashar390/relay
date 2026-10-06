@@ -53,3 +53,31 @@ test("GET /api/jobs returns the sample jobs as JSON", async () => {
     ],
   );
 });
+
+test("GET /api/jobs/:id returns one job", async () => {
+  const response = await request("/api/jobs/job_1042", {
+    accept: "application/json",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), {
+    id: "job_1042",
+    name: "Import customer records",
+    status: "running",
+    createdAt: "Just now",
+    attempts: 1,
+  });
+});
+
+test("GET /api/jobs/:id returns 404 for an unknown job", async () => {
+  const response = await request("/api/jobs/job_missing", {
+    accept: "application/json",
+  });
+
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), {
+    error: "Job not found",
+    jobId: "job_missing",
+  });
+});

@@ -26,7 +26,7 @@ Relay will demonstrate a multi-step customer import workflow:
 
 ## Status
 
-Relay is currently in its initial development stage. The application includes the product overview, the first operations dashboard, and a read-only `GET /api/jobs` endpoint. Both the dashboard and API currently use sample job data; live job processing is not implemented yet.
+Relay is currently in its initial development stage. The application includes the product overview, the first operations dashboard, and read-only endpoints for listing jobs (`GET /api/jobs`) and looking up a job by ID (`GET /api/jobs/:id`). The dashboard and API currently use sample job data; live job processing is not implemented yet.
 
 ## Technology direction
 
