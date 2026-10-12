@@ -1,5 +1,5 @@
 import { JobList } from "./components/job-list";
-import { sampleJobs } from "./lib/jobs";
+import { listJobs } from "./lib/job-repository";
 
 const stages = [
   { number: "01", title: "Submit", copy: "A website sends Relay a slow task." },
@@ -9,6 +9,8 @@ const stages = [
 ];
 
 export default function Home() {
+  const jobs = listJobs();
+
   return (
     <main>
       <nav className="nav" aria-label="Primary navigation">
@@ -59,7 +61,7 @@ export default function Home() {
             Sample data for the first dashboard iteration. Live queue data comes next.
           </p>
         </div>
-        <JobList jobs={sampleJobs} />
+        <JobList jobs={jobs} />
       </section>
 
       <section className="promise" aria-labelledby="promise-title">

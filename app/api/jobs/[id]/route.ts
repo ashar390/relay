@@ -1,4 +1,4 @@
-import { sampleJobs } from "../../../lib/jobs";
+import { findJobById } from "../../../lib/job-repository";
 
 type JobRouteContext = {
   params: Promise<{ id: string }>;
@@ -6,7 +6,7 @@ type JobRouteContext = {
 
 export async function GET(_request: Request, { params }: JobRouteContext) {
   const { id } = await params;
-  const job = sampleJobs.find((candidate) => candidate.id === id);
+  const job = findJobById(id);
 
   if (!job) {
     return Response.json(

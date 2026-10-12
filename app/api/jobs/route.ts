@@ -1,10 +1,12 @@
-import { sampleJobs, submitJob } from "../../lib/jobs";
+import { listJobs, saveJob } from "../../lib/job-repository";
 
 export function GET() {
+  const jobs = listJobs();
+
   return Response.json(
     {
-      jobs: sampleJobs,
-      total: sampleJobs.length,
+      jobs,
+      total: jobs.length,
     },
     {
       headers: {
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const job = submitJob({
+  const job = saveJob({
     name: body.name.trim(),
     type: body.type.trim(),
   });
