@@ -57,7 +57,7 @@ test("GET /api/jobs returns the sample jobs as JSON", async () => {
 
 test("GET /api/jobs/:id returns one job", async () => {
   const response = await request("/api/jobs/job_1042", {
-    accept: "application/json",
+    headers: { accept: "application/json" },
   });
 
   assert.equal(response.status, 200);
@@ -66,6 +66,7 @@ test("GET /api/jobs/:id returns one job", async () => {
     id: "job_1042",
     name: "Import customer records",
     type: "customers.import",
+    payload: { fileName: "customers-october.csv" },
     status: "running",
     createdAt: "Just now",
     attempts: 1,
@@ -79,6 +80,10 @@ test("POST /api/jobs accepts a valid job submission", async () => {
     body: JSON.stringify({
       name: "Generate monthly invoice",
       type: "invoice.generate",
+      payload: {
+        customerId: "cust_123",
+        month: "2026-10",
+      },
     }),
   });
 
@@ -91,6 +96,10 @@ test("POST /api/jobs accepts a valid job submission", async () => {
     id: body.id,
     name: "Generate monthly invoice",
     type: "invoice.generate",
+    payload: {
+      customerId: "cust_123",
+      month: "2026-10",
+    },
     status: "queued",
     createdAt: body.createdAt,
     attempts: 0,
@@ -105,16 +114,56 @@ test("POST /api/jobs accepts a valid job submission", async () => {
   assert.deepEqual(await lookupResponse.json(), body);
 });
 
-test("POST /api/jobs rejects an invalid job submission", async () => {
+test("POST /api/jobs explains invalid job submission fields", async () => {
   const response = await request("/api/jobs", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Generate monthly invoice" }),
+    body: JSON.stringify({
+      name: "",
+      type: "Generate Invoice",
+      payload: [],
+    }),
   });
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
-    error: "Job name and type are required",
+    error: "Invalid job submission",
+    issues: [
+      "name must contain 1 to 100 characters",
+      "type must use dot-separated lowercase words, such as invoice.generate",
+      "payload must be a JSON object",
+    ],
+  });
+});
+
+test("POST /api/jobs rejects malformed JSON", async () => {
+  const response = await request("/api/jobs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{",
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Request body must be valid JSON",
+  });
+});
+
+test("POST /api/jobs rejects payloads larger than 16 KB", async () => {
+  const response = await request("/api/jobs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Import customer records",
+      type: "customers.import",
+      payload: { contents: "x".repeat(16 * 1024) },
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Invalid job submission",
+    issues: ["payload must be 16 KB or smaller"],
   });
 });
 

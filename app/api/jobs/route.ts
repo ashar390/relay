@@ -1,4 +1,5 @@
 import { listJobs, saveJob } from "../../lib/job-repository";
+import { validateJobSubmission } from "../../lib/job-submission";
 
 export function GET() {
   const jobs = listJobs();
@@ -28,17 +29,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isJobSubmission(body)) {
+  const submission = validateJobSubmission(body);
+
+  if (!submission.success) {
     return Response.json(
-      { error: "Job name and type are required" },
+      {
+        error: "Invalid job submission",
+        issues: submission.issues,
+      },
       { status: 400 },
     );
   }
 
-  const job = saveJob({
-    name: body.name.trim(),
-    type: body.type.trim(),
-  });
+  const job = saveJob(submission.data);
 
   return Response.json(job, {
     status: 201,
@@ -46,21 +49,4 @@ export async function POST(request: Request) {
       Location: `/api/jobs/${job.id}`,
     },
   });
-}
-
-function isJobSubmission(
-  value: unknown,
-): value is { name: string; type: string } {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const submission = value as Record<string, unknown>;
-
-  return (
-    typeof submission.name === "string" &&
-    submission.name.trim().length > 0 &&
-    typeof submission.type === "string" &&
-    submission.type.trim().length > 0
-  );
 }
