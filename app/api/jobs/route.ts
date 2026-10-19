@@ -1,4 +1,5 @@
-import { listJobs, saveJob } from "../../lib/job-repository";
+import { enqueueJob } from "../../lib/job-queue";
+import { listJobs, removeJobById, saveJob } from "../../lib/job-repository";
 import { validateJobSubmission } from "../../lib/job-submission";
 
 export function GET() {
@@ -42,6 +43,17 @@ export async function POST(request: Request) {
   }
 
   const job = saveJob(submission.data);
+
+  try {
+    await enqueueJob(job);
+  } catch {
+    removeJobById(job.id);
+
+    return Response.json(
+      { error: "Job could not be queued" },
+      { status: 503 },
+    );
+  }
 
   return Response.json(job, {
     status: 201,

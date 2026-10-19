@@ -1,9 +1,12 @@
 /** Cloudflare Worker entry point for Relay. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { runWithRuntimeBindings } from "../app/lib/runtime-bindings";
 
-interface Env {
-  ASSETS: Fetcher;
+interface Env extends Cloudflare.Env {
+  ASSETS: {
+    fetch(request: Request): Promise<Response>;
+  };
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -39,7 +42,10 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    return runWithRuntimeBindings(
+      { JOB_QUEUE: env.JOB_QUEUE },
+      () => handler.fetch(request, env, ctx),
+    );
   },
 };
 

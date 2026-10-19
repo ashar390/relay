@@ -53,3 +53,11 @@ export function saveJob(input: CreateJobInput): Job {
 
   return job;
 }
+
+export function removeJobById(id: string): void {
+  const index = jobs.findIndex((job) => job.id === id);
+
+  if (index !== -1) {
+    jobs.splice(index, 1);
+  }
+}

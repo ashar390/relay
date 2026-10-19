@@ -1,13 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-async function request(path = "/", init = {}) {
+const queuedMessages = [];
+
+const defaultQueue = {
+  async send(message) {
+    queuedMessages.push(message);
+  },
+};
+
+async function request(path = "/", init = {}, bindings = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
     new Request(`http://localhost${path}`, init),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    {
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      JOB_QUEUE: defaultQueue,
+      ...bindings,
+    },
     { waitUntil() {}, passThroughOnException() {} },
   );
 }
@@ -74,6 +86,8 @@ test("GET /api/jobs/:id returns one job", async () => {
 });
 
 test("POST /api/jobs accepts a valid job submission", async () => {
+  queuedMessages.length = 0;
+
   const response = await request("/api/jobs", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -105,6 +119,17 @@ test("POST /api/jobs accepts a valid job submission", async () => {
     attempts: 0,
   });
   assert.equal(Number.isNaN(Date.parse(body.createdAt)), false);
+  assert.deepEqual(queuedMessages, [
+    {
+      id: body.id,
+      type: "invoice.generate",
+      payload: {
+        customerId: "cust_123",
+        month: "2026-10",
+      },
+      createdAt: body.createdAt,
+    },
+  ]);
 
   const lookupResponse = await request(`/api/jobs/${body.id}`, {
     headers: { accept: "application/json" },
@@ -164,6 +189,33 @@ test("POST /api/jobs rejects payloads larger than 16 KB", async () => {
   assert.deepEqual(await response.json(), {
     error: "Invalid job submission",
     issues: ["payload must be 16 KB or smaller"],
+  });
+});
+
+test("POST /api/jobs returns 503 when the queue is unavailable", async () => {
+  const response = await request(
+    "/api/jobs",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Generate monthly invoice",
+        type: "invoice.generate",
+        payload: { customerId: "cust_456" },
+      }),
+    },
+    {
+      JOB_QUEUE: {
+        async send() {
+          throw new Error("Queue unavailable");
+        },
+      },
+    },
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "Job could not be queued",
   });
 });
 
