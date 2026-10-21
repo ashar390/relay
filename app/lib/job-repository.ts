@@ -1,4 +1,9 @@
-import { createJob, type CreateJobInput, type Job } from "./jobs";
+import {
+  createJob,
+  type CreateJobInput,
+  type Job,
+  type JobStatus,
+} from "./jobs";
 
 const jobs: Job[] = [
   {
@@ -60,4 +65,20 @@ export function removeJobById(id: string): void {
   if (index !== -1) {
     jobs.splice(index, 1);
   }
+}
+
+export function updateJobStatus(id: string, status: JobStatus): Job | undefined {
+  const job = findJobById(id);
+
+  if (!job) {
+    return undefined;
+  }
+
+  job.status = status;
+
+  if (status === "running") {
+    job.attempts += 1;
+  }
+
+  return job;
 }

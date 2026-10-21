@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { runWithRuntimeBindings } from "../app/lib/runtime-bindings";
+import { consumeJobBatch, type JobMessageBatch } from "../app/lib/job-consumer";
 
 interface Env extends Cloudflare.Env {
   ASSETS: {
@@ -46,6 +47,10 @@ const worker = {
       { JOB_QUEUE: env.JOB_QUEUE },
       () => handler.fetch(request, env, ctx),
     );
+  },
+
+  async queue(batch: JobMessageBatch): Promise<void> {
+    await consumeJobBatch(batch);
   },
 };
 

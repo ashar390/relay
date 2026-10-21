@@ -9,9 +9,15 @@ const defaultQueue = {
   },
 };
 
-async function request(path = "/", init = {}, bindings = {}) {
+async function loadWorker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   const { default: worker } = await import(workerUrl.href);
+
+  return worker;
+}
+
+async function request(path = "/", init = {}, bindings = {}) {
+  const worker = await loadWorker();
 
   return worker.fetch(
     new Request(`http://localhost${path}`, init),
@@ -217,6 +223,86 @@ test("POST /api/jobs returns 503 when the queue is unavailable", async () => {
   assert.deepEqual(await response.json(), {
     error: "Job could not be queued",
   });
+});
+
+test("queue consumer completes and acknowledges a supported job", async () => {
+  queuedMessages.length = 0;
+
+  const createResponse = await request("/api/jobs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Import customer records",
+      type: "customers.import",
+      payload: { fileName: "customers-october.csv" },
+    }),
+  });
+  const job = await createResponse.json();
+  let acknowledged = false;
+  let retried = false;
+  const worker = await loadWorker();
+
+  await worker.queue({
+    messages: [
+      {
+        body: queuedMessages[0],
+        ack() {
+          acknowledged = true;
+        },
+        retry() {
+          retried = true;
+        },
+      },
+    ],
+  });
+
+  const lookupResponse = await request(`/api/jobs/${job.id}`);
+  const completedJob = await lookupResponse.json();
+
+  assert.equal(acknowledged, true);
+  assert.equal(retried, false);
+  assert.equal(completedJob.status, "completed");
+  assert.equal(completedJob.attempts, 1);
+});
+
+test("queue consumer fails and retries an unsupported job", async () => {
+  queuedMessages.length = 0;
+
+  const createResponse = await request("/api/jobs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Run unsupported task",
+      type: "unknown.run",
+      payload: {},
+    }),
+  });
+  const job = await createResponse.json();
+  let acknowledged = false;
+  let retryOptions;
+  const worker = await loadWorker();
+
+  await worker.queue({
+    messages: [
+      {
+        body: queuedMessages[0],
+        ack() {
+          acknowledged = true;
+        },
+        retry(options) {
+          retryOptions = options;
+        },
+      },
+    ],
+  });
+
+  const lookupResponse = await request(`/api/jobs/${job.id}`);
+  const failedJob = await lookupResponse.json();
+
+  assert.equal(acknowledged, false);
+  assert.deepEqual(retryOptions, { delaySeconds: 30 });
+  assert.equal(failedJob.status, "failed");
+  assert.equal(failedJob.attempts, 1);
 });
 
 test("GET /api/jobs/:id returns 404 for an unknown job", async () => {
