@@ -1,5 +1,5 @@
 import { JobList } from "./components/job-list";
-import { listJobs } from "./lib/job-repository";
+import { jobRepository } from "./lib/job-repository";
 
 const stages = [
   { number: "01", title: "Submit", copy: "A website sends Relay a slow task." },
@@ -8,8 +8,8 @@ const stages = [
   { number: "04", title: "Understand", copy: "Relay reports the result or explains the failure." },
 ];
 
-export default function Home() {
-  const jobs = listJobs();
+export default async function Home() {
+  const jobs = await jobRepository.list();
 
   return (
     <main>

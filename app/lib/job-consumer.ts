@@ -1,5 +1,5 @@
 import type { JobQueueMessage } from "./job-queue";
-import { updateJobStatus } from "./job-repository";
+import { jobRepository } from "./job-repository";
 
 const RETRY_DELAY_SECONDS = 30;
 
@@ -19,21 +19,21 @@ export async function consumeJobBatch(batch: JobMessageBatch): Promise<void> {
       await processJob(message.body);
       message.ack();
     } catch {
-      updateJobStatus(message.body.id, "failed");
+      await jobRepository.updateStatus(message.body.id, "failed");
       message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
     }
   }
 }
 
 async function processJob(message: JobQueueMessage): Promise<void> {
-  const job = updateJobStatus(message.id, "running");
+  const job = await jobRepository.updateStatus(message.id, "running");
 
   if (!job) {
     throw new Error(`Job ${message.id} was not found`);
   }
 
   validateSupportedPayload(message);
-  updateJobStatus(message.id, "completed");
+  await jobRepository.updateStatus(message.id, "completed");
 }
 
 function validateSupportedPayload(message: JobQueueMessage): void {
