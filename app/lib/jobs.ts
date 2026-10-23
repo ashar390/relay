@@ -2,6 +2,13 @@ export const jobStatuses = ["queued", "running", "completed", "failed"] as const
 
 export type JobStatus = (typeof jobStatuses)[number];
 
+export type JobFailure = {
+  code: string;
+  message: string;
+  retryable: boolean;
+  occurredAt: string;
+};
+
 export type Job = {
   id: string;
   name: string;
@@ -10,6 +17,7 @@ export type Job = {
   status: JobStatus;
   createdAt: string;
   attempts: number;
+  failure: JobFailure | null;
 };
 
 export type CreateJobInput = {
@@ -27,5 +35,6 @@ export function createJob(input: CreateJobInput): Job {
     status: "queued",
     createdAt: new Date().toISOString(),
     attempts: 0,
+    failure: null,
   };
 }

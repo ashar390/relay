@@ -88,6 +88,7 @@ test("GET /api/jobs/:id returns one job", async () => {
     status: "running",
     createdAt: "Just now",
     attempts: 1,
+    failure: null,
   });
 });
 
@@ -123,6 +124,7 @@ test("POST /api/jobs accepts a valid job submission", async () => {
     status: "queued",
     createdAt: body.createdAt,
     attempts: 0,
+    failure: null,
   });
   assert.equal(Number.isNaN(Date.parse(body.createdAt)), false);
   assert.deepEqual(queuedMessages, [
@@ -265,7 +267,7 @@ test("queue consumer completes and acknowledges a supported job", async () => {
   assert.equal(completedJob.attempts, 1);
 });
 
-test("queue consumer fails and retries an unsupported job", async () => {
+test("queue consumer records and acknowledges a permanent failure", async () => {
   queuedMessages.length = 0;
 
   const createResponse = await request("/api/jobs", {
@@ -299,10 +301,41 @@ test("queue consumer fails and retries an unsupported job", async () => {
   const lookupResponse = await request(`/api/jobs/${job.id}`);
   const failedJob = await lookupResponse.json();
 
-  assert.equal(acknowledged, false);
-  assert.deepEqual(retryOptions, { delaySeconds: 30 });
+  assert.equal(acknowledged, true);
+  assert.equal(retryOptions, undefined);
   assert.equal(failedJob.status, "failed");
   assert.equal(failedJob.attempts, 1);
+  assert.equal(failedJob.failure.code, "UNSUPPORTED_JOB_TYPE");
+  assert.equal(failedJob.failure.retryable, false);
+  assert.equal(Number.isNaN(Date.parse(failedJob.failure.occurredAt)), false);
+});
+
+test("queue consumer retries when a queued job cannot be found", async () => {
+  let acknowledged = false;
+  let retryOptions;
+  const worker = await loadWorker();
+
+  await worker.queue({
+    messages: [
+      {
+        body: {
+          id: "job_missing_from_repository",
+          type: "report.generate",
+          payload: { importId: "import_999" },
+          createdAt: new Date().toISOString(),
+        },
+        ack() {
+          acknowledged = true;
+        },
+        retry(options) {
+          retryOptions = options;
+        },
+      },
+    ],
+  });
+
+  assert.equal(acknowledged, false);
+  assert.deepEqual(retryOptions, { delaySeconds: 30 });
 });
 
 test("GET /api/jobs/:id returns 404 for an unknown job", async () => {

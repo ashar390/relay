@@ -2,6 +2,7 @@ import {
   createJob,
   type CreateJobInput,
   type Job,
+  type JobFailure,
   type JobStatus,
 } from "./jobs";
 
@@ -11,6 +12,7 @@ export interface JobRepository {
   save(input: CreateJobInput): Promise<Job>;
   removeById(id: string): Promise<void>;
   updateStatus(id: string, status: JobStatus): Promise<Job | undefined>;
+  markFailed(id: string, failure: JobFailure): Promise<Job | undefined>;
 }
 
 class InMemoryJobRepository implements JobRepository {
@@ -23,6 +25,7 @@ class InMemoryJobRepository implements JobRepository {
       status: "running",
       createdAt: "Just now",
       attempts: 1,
+      failure: null,
     },
     {
       id: "job_1041",
@@ -32,6 +35,7 @@ class InMemoryJobRepository implements JobRepository {
       status: "queued",
       createdAt: "2 min ago",
       attempts: 0,
+      failure: null,
     },
     {
       id: "job_1040",
@@ -41,6 +45,7 @@ class InMemoryJobRepository implements JobRepository {
       status: "completed",
       createdAt: "8 min ago",
       attempts: 1,
+      failure: null,
     },
     {
       id: "job_1039",
@@ -50,6 +55,12 @@ class InMemoryJobRepository implements JobRepository {
       status: "failed",
       createdAt: "12 min ago",
       attempts: 3,
+      failure: {
+        code: "INVALID_JOB_PAYLOAD",
+        message: "csv.validate requires payload.fileName",
+        retryable: false,
+        occurredAt: "12 min ago",
+      },
     },
   ];
 
@@ -91,6 +102,26 @@ class InMemoryJobRepository implements JobRepository {
     if (status === "running") {
       job.attempts += 1;
     }
+
+    if (status !== "failed") {
+      job.failure = null;
+    }
+
+    return job;
+  }
+
+  async markFailed(
+    id: string,
+    failure: JobFailure,
+  ): Promise<Job | undefined> {
+    const job = await this.findById(id);
+
+    if (!job) {
+      return undefined;
+    }
+
+    job.status = "failed";
+    job.failure = failure;
 
     return job;
   }

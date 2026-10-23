@@ -18,9 +18,18 @@ export async function consumeJobBatch(batch: JobMessageBatch): Promise<void> {
     try {
       await processJob(message.body);
       message.ack();
-    } catch {
-      await jobRepository.updateStatus(message.body.id, "failed");
-      message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+    } catch (error) {
+      const failure = describeFailure(error);
+      await jobRepository.markFailed(message.body.id, {
+        ...failure,
+        occurredAt: new Date().toISOString(),
+      });
+
+      if (failure.retryable) {
+        message.retry({ delaySeconds: RETRY_DELAY_SECONDS });
+      } else {
+        message.ack();
+      }
     }
   }
 }
@@ -29,7 +38,11 @@ async function processJob(message: JobQueueMessage): Promise<void> {
   const job = await jobRepository.updateStatus(message.id, "running");
 
   if (!job) {
-    throw new Error(`Job ${message.id} was not found`);
+    throw new JobProcessingError(
+      "JOB_NOT_FOUND",
+      `Job ${message.id} was not found`,
+      true,
+    );
   }
 
   validateSupportedPayload(message);
@@ -47,13 +60,52 @@ function validateSupportedPayload(message: JobQueueMessage): void {
   const requiredField = requiredFields[message.type];
 
   if (!requiredField) {
-    throw new Error(`No handler is registered for ${message.type}`);
+    throw new JobProcessingError(
+      "UNSUPPORTED_JOB_TYPE",
+      `No handler is registered for ${message.type}`,
+      false,
+    );
   }
 
   if (
     typeof message.payload[requiredField] !== "string" ||
     message.payload[requiredField].trim().length === 0
   ) {
-    throw new Error(`${message.type} requires payload.${requiredField}`);
+    throw new JobProcessingError(
+      "INVALID_JOB_PAYLOAD",
+      `${message.type} requires payload.${requiredField}`,
+      false,
+    );
   }
+}
+
+class JobProcessingError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = "JobProcessingError";
+  }
+}
+
+function describeFailure(error: unknown): {
+  code: string;
+  message: string;
+  retryable: boolean;
+} {
+  if (error instanceof JobProcessingError) {
+    return {
+      code: error.code,
+      message: error.message,
+      retryable: error.retryable,
+    };
+  }
+
+  return {
+    code: "JOB_PROCESSING_ERROR",
+    message: "The job could not be processed",
+    retryable: true,
+  };
 }

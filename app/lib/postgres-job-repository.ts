@@ -3,6 +3,7 @@ import {
   createJob,
   type CreateJobInput,
   type Job,
+  type JobFailure,
   type JobStatus,
 } from "./jobs";
 import type { JobRepository } from "./job-repository";
@@ -15,6 +16,7 @@ type JobRow = {
   status: JobStatus;
   created_at: Date | string;
   attempts: number;
+  failure: JobFailure | null;
 };
 
 export interface DatabaseClient {
@@ -40,7 +42,7 @@ export class PostgresJobRepository implements JobRepository {
 
   async list(): Promise<Job[]> {
     const rows = await this.database.query<JobRow>(`
-      SELECT id, name, type, payload, status, created_at, attempts
+      SELECT id, name, type, payload, status, created_at, attempts, failure
       FROM jobs
       ORDER BY created_at DESC
     `);
@@ -50,7 +52,7 @@ export class PostgresJobRepository implements JobRepository {
 
   async findById(id: string): Promise<Job | undefined> {
     const [row] = await this.database.query<JobRow>(`
-      SELECT id, name, type, payload, status, created_at, attempts
+      SELECT id, name, type, payload, status, created_at, attempts, failure
       FROM jobs
       WHERE id = $1
       LIMIT 1
@@ -64,7 +66,7 @@ export class PostgresJobRepository implements JobRepository {
     const [row] = await this.database.query<JobRow>(`
       INSERT INTO jobs (id, name, type, payload, status, created_at, attempts)
       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
-      RETURNING id, name, type, payload, status, created_at, attempts
+      RETURNING id, name, type, payload, status, created_at, attempts, failure
     `, [
       job.id,
       job.name,
@@ -91,10 +93,28 @@ export class PostgresJobRepository implements JobRepository {
       SET
         status = $2,
         attempts = attempts + CASE WHEN $2 = 'running' THEN 1 ELSE 0 END,
+        updated_at = CURRENT_TIMESTAMP,
+        failure = CASE WHEN $2 = 'failed' THEN failure ELSE NULL END
+      WHERE id = $1
+      RETURNING id, name, type, payload, status, created_at, attempts, failure
+    `, [id, status]);
+
+    return row ? toJob(row) : undefined;
+  }
+
+  async markFailed(
+    id: string,
+    failure: JobFailure,
+  ): Promise<Job | undefined> {
+    const [row] = await this.database.query<JobRow>(`
+      UPDATE jobs
+      SET
+        status = 'failed',
+        failure = $2::jsonb,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
-      RETURNING id, name, type, payload, status, created_at, attempts
-    `, [id, status]);
+      RETURNING id, name, type, payload, status, created_at, attempts, failure
+    `, [id, JSON.stringify(failure)]);
 
     return row ? toJob(row) : undefined;
   }
@@ -112,5 +132,6 @@ function toJob(row: JobRow): Job {
         ? row.created_at.toISOString()
         : row.created_at,
     attempts: row.attempts,
+    failure: row.failure,
   };
 }
