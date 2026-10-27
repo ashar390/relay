@@ -338,6 +338,70 @@ test("queue consumer retries when a queued job cannot be found", async () => {
   assert.deepEqual(retryOptions, { delaySeconds: 30 });
 });
 
+test("POST /api/jobs/:id/retry preserves failure details when the queue is unavailable", async () => {
+  const beforeResponse = await request("/api/jobs/job_1039");
+  const before = await beforeResponse.json();
+
+  const response = await request(
+    "/api/jobs/job_1039/retry",
+    { method: "POST" },
+    {
+      JOB_QUEUE: {
+        async send() {
+          throw new Error("Queue unavailable");
+        },
+      },
+    },
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "Job could not be queued for retry",
+  });
+
+  const afterResponse = await request("/api/jobs/job_1039");
+  const after = await afterResponse.json();
+  assert.equal(after.status, "failed");
+  assert.deepEqual(after.failure, before.failure);
+});
+
+test("POST /api/jobs/:id/retry queues a failed job again", async () => {
+  queuedMessages.length = 0;
+
+  const response = await request("/api/jobs/job_1039/retry", {
+    method: "POST",
+  });
+
+  assert.equal(response.status, 202);
+  assert.equal(response.headers.get("location"), "/api/jobs/job_1039");
+
+  const retriedJob = await response.json();
+  assert.equal(retriedJob.status, "queued");
+  assert.equal(retriedJob.failure, null);
+  assert.equal(retriedJob.attempts, 3);
+  assert.deepEqual(queuedMessages, [
+    {
+      id: "job_1039",
+      type: "csv.validate",
+      payload: { fileName: "customers-september.csv" },
+      createdAt: "12 min ago",
+    },
+  ]);
+});
+
+test("POST /api/jobs/:id/retry rejects a job that has not failed", async () => {
+  const response = await request("/api/jobs/job_1042/retry", {
+    method: "POST",
+  });
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    error: "Only failed jobs can be retried",
+    jobId: "job_1042",
+    status: "running",
+  });
+});
+
 test("GET /api/jobs/:id returns 404 for an unknown job", async () => {
   const response = await request("/api/jobs/job_missing", {
     headers: { accept: "application/json" },
