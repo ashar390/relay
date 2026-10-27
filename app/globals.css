@@ -86,6 +86,16 @@ h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(38px, 5vw, 68px); 
 .status-queued { color: #675c55; background: #e8dfd0; }
 .status-completed { color: #376044; background: #dce8d8; border-color: #abc4a6; }
 .status-failed { color: var(--signal-dark); background: #f0d2c8; border-color: #d99b8e; }
+.failure-summary {
+  grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; gap: 14px;
+  align-items: center; margin: 0 0 8px; padding: 12px 14px; border-left: 3px solid var(--signal);
+  background: #eadfd1; color: #5d4c43; font-size: 13px; line-height: 1.45;
+}
+.failure-code {
+  color: var(--signal-dark); font-family: monospace; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em;
+}
+.failure-policy { color: #79675e; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .promise { margin-bottom: 80px; padding: 72px; background: var(--signal); color: var(--paper); }
 .promise h2 { margin-top: 26px; max-width: 820px; }
 .accent-copy { max-width: 850px; margin: 18px 0 56px; color: #fff8ea; font-family: Georgia, serif; font-size: clamp(28px, 4vw, 47px); line-height: 1.15; }
@@ -101,7 +111,8 @@ footer { display: flex; justify-content: space-between; padding: 28px 0 44px; bo
   .dashboard-heading { grid-template-columns: 1fr; gap: 20px; }
   .stage-grid { grid-template-columns: repeat(2, 1fr); }
   .job-row { grid-template-columns: minmax(210px, 2fr) 1fr 1fr; }
-  .job-row > :last-child { display: none; }
+  .job-row > :nth-child(4) { display: none; }
+  .failure-summary { grid-template-columns: 1fr; gap: 5px; }
   .stage:nth-child(2) { border-right: 0; }
   .promise { padding: 48px 32px; }
 }
@@ -114,5 +125,6 @@ footer { display: flex; justify-content: space-between; padding: 28px 0 44px; bo
   .job-header { display: none; }
   .job-row { grid-template-columns: 1fr auto; gap: 14px; padding: 18px 4px; }
   .job-row > :nth-child(3) { display: none; }
+  .failure-summary { display: grid; }
   footer { flex-direction: column; gap: 10px; }
 }

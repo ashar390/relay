@@ -6,7 +6,7 @@ type JobListProps = {
 
 export function JobList({ jobs }: JobListProps) {
   return (
-    <div className="job-table" role="table" aria-label="Sample background jobs">
+    <div className="job-table" role="table" aria-label="Background jobs">
       <div className="job-row job-header" role="row">
         <span role="columnheader">Job</span>
         <span role="columnheader">Status</span>
@@ -26,6 +26,17 @@ export function JobList({ jobs }: JobListProps) {
           </span>
           <span role="cell">{job.createdAt}</span>
           <span role="cell">{job.attempts}</span>
+          {job.failure ? (
+            <div className="failure-summary" role="cell">
+              <span className="failure-code">{job.failure.code}</span>
+              <span>{job.failure.message}</span>
+              <span className="failure-policy">
+                {job.failure.retryable
+                  ? "Retry scheduled"
+                  : "Manual review required"}
+              </span>
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

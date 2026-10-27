@@ -46,6 +46,9 @@ test("server-renders Relay's product overview and sample job dashboard", async (
   assert.match(html, />queued</i);
   assert.match(html, />completed</i);
   assert.match(html, />failed</i);
+  assert.match(html, /INVALID_JOB_PAYLOAD/);
+  assert.match(html, /csv\.validate requires payload\.fileName/);
+  assert.match(html, /Manual review required/);
   assert.match(html, /Most tools tell you a job failed/);
   assert.doesNotMatch(html, /Week 1|Day 1|learning in public/i);
 });
