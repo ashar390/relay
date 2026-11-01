@@ -1,8 +1,10 @@
 import { enqueueJob } from "../../lib/job-queue";
-import { jobRepository } from "../../lib/job-repository";
+import { requireApiKey } from "../../lib/api-auth";
+import { getJobRepository } from "../../lib/repository-provider";
 import { validateJobSubmission } from "../../lib/job-submission";
 
 export async function GET() {
+  const jobRepository = getJobRepository();
   const jobs = await jobRepository.list();
 
   return Response.json(
@@ -19,6 +21,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = requireApiKey(request);
+
+  if (unauthorized) {
+    return unauthorized;
+  }
+
+  const jobRepository = getJobRepository();
   let body: unknown;
 
   try {

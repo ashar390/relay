@@ -1,6 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-type RuntimeBindings = Pick<Cloudflare.Env, "JOB_QUEUE">;
+export type RuntimeBindings = Pick<Cloudflare.Env, "JOB_QUEUE"> & {
+  HYPERDRIVE?: { connectionString: string };
+  RELAY_API_KEY?: string;
+};
 
 const bindingStore = new AsyncLocalStorage<RuntimeBindings>();
 
@@ -19,4 +22,8 @@ export function getRuntimeBindings(): RuntimeBindings {
   }
 
   return bindings;
+}
+
+export function getOptionalRuntimeBindings(): RuntimeBindings | undefined {
+  return bindingStore.getStore();
 }

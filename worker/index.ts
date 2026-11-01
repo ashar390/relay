@@ -5,6 +5,8 @@ import { runWithRuntimeBindings } from "../app/lib/runtime-bindings";
 import { consumeJobBatch, type JobMessageBatch } from "../app/lib/job-consumer";
 
 interface Env extends Cloudflare.Env {
+  HYPERDRIVE?: { connectionString: string };
+  RELAY_API_KEY?: string;
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
@@ -44,13 +46,24 @@ const worker = {
     }
 
     return runWithRuntimeBindings(
-      { JOB_QUEUE: env.JOB_QUEUE },
+      {
+        JOB_QUEUE: env.JOB_QUEUE,
+        HYPERDRIVE: env.HYPERDRIVE,
+        RELAY_API_KEY: env.RELAY_API_KEY,
+      },
       () => handler.fetch(request, env, ctx),
     );
   },
 
-  async queue(batch: JobMessageBatch): Promise<void> {
-    await consumeJobBatch(batch);
+  async queue(batch: JobMessageBatch, env?: Env): Promise<void> {
+    await runWithRuntimeBindings(
+      {
+        JOB_QUEUE: env?.JOB_QUEUE as Cloudflare.Env["JOB_QUEUE"],
+        HYPERDRIVE: env?.HYPERDRIVE,
+        RELAY_API_KEY: env?.RELAY_API_KEY,
+      },
+      () => consumeJobBatch(batch),
+    );
   },
 };
 

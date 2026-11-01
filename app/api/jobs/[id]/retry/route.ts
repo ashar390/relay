@@ -1,12 +1,20 @@
+import { requireApiKey } from "../../../../lib/api-auth";
 import { enqueueJob } from "../../../../lib/job-queue";
-import { jobRepository } from "../../../../lib/job-repository";
+import { getJobRepository } from "../../../../lib/repository-provider";
 
 type RetryJobRouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function POST(_request: Request, { params }: RetryJobRouteContext) {
+export async function POST(request: Request, { params }: RetryJobRouteContext) {
+  const unauthorized = requireApiKey(request);
+
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const { id } = await params;
+  const jobRepository = getJobRepository();
   const job = await jobRepository.findById(id);
 
   if (!job) {
