@@ -13,9 +13,11 @@ export interface JobRepository {
   removeById(id: string): Promise<void>;
   updateStatus(id: string, status: JobStatus): Promise<Job | undefined>;
   markFailed(id: string, failure: JobFailure): Promise<Job | undefined>;
+  updateProgress(id: string, progress: number, message: string): Promise<Job | undefined>;
+  complete(id: string, result: Record<string, unknown>): Promise<Job | undefined>;
 }
 
-class InMemoryJobRepository implements JobRepository {
+export class InMemoryJobRepository implements JobRepository {
   private readonly jobs: Job[] = [
     {
       id: "job_1042",
@@ -26,6 +28,13 @@ class InMemoryJobRepository implements JobRepository {
       createdAt: "Just now",
       attempts: 1,
       failure: null,
+      progress: 45,
+      result: null,
+      updatedAt: "Just now",
+      history: [
+        { status: "queued", message: "Job accepted", at: "1 min ago" },
+        { status: "running", message: "Worker started processing", at: "Just now" },
+      ],
     },
     {
       id: "job_1041",
@@ -36,6 +45,10 @@ class InMemoryJobRepository implements JobRepository {
       createdAt: "2 min ago",
       attempts: 0,
       failure: null,
+      progress: 0,
+      result: null,
+      updatedAt: "2 min ago",
+      history: [{ status: "queued", message: "Job accepted", at: "2 min ago" }],
     },
     {
       id: "job_1040",
@@ -46,6 +59,13 @@ class InMemoryJobRepository implements JobRepository {
       createdAt: "8 min ago",
       attempts: 1,
       failure: null,
+      progress: 100,
+      result: { deliveryStatus: "accepted", importId: "import_203" },
+      updatedAt: "7 min ago",
+      history: [
+        { status: "queued", message: "Job accepted", at: "8 min ago" },
+        { status: "completed", message: "Job completed", at: "7 min ago" },
+      ],
     },
     {
       id: "job_1039",
@@ -61,6 +81,13 @@ class InMemoryJobRepository implements JobRepository {
         retryable: false,
         occurredAt: "12 min ago",
       },
+      progress: 20,
+      result: null,
+      updatedAt: "12 min ago",
+      history: [
+        { status: "queued", message: "Job accepted", at: "14 min ago" },
+        { status: "failed", message: "csv.validate requires payload.fileName", at: "12 min ago" },
+      ],
     },
   ];
 
@@ -98,6 +125,7 @@ class InMemoryJobRepository implements JobRepository {
     }
 
     job.status = status;
+    job.updatedAt = new Date().toISOString();
 
     if (status === "running") {
       job.attempts += 1;
@@ -106,6 +134,17 @@ class InMemoryJobRepository implements JobRepository {
     if (status !== "failed") {
       job.failure = null;
     }
+
+    if (status === "queued") {
+      job.progress = 0;
+      job.result = null;
+    }
+
+    job.history.push({
+      status,
+      message: statusMessage(status),
+      at: job.updatedAt,
+    });
 
     return job;
   }
@@ -122,9 +161,68 @@ class InMemoryJobRepository implements JobRepository {
 
     job.status = "failed";
     job.failure = failure;
+    job.updatedAt = failure.occurredAt;
+    job.history.push({
+      status: "failed",
+      message: failure.message,
+      at: failure.occurredAt,
+    });
+
+    return job;
+  }
+
+  async updateProgress(
+    id: string,
+    progress: number,
+    message: string,
+  ): Promise<Job | undefined> {
+    const job = await this.findById(id);
+
+    if (!job) {
+      return undefined;
+    }
+
+    job.progress = Math.max(0, Math.min(100, progress));
+    job.updatedAt = new Date().toISOString();
+    job.history.push({ status: "running", message, at: job.updatedAt });
+
+    return job;
+  }
+
+  async complete(
+    id: string,
+    result: Record<string, unknown>,
+  ): Promise<Job | undefined> {
+    const job = await this.findById(id);
+
+    if (!job) {
+      return undefined;
+    }
+
+    job.status = "completed";
+    job.progress = 100;
+    job.result = result;
+    job.failure = null;
+    job.updatedAt = new Date().toISOString();
+    job.history.push({
+      status: "completed",
+      message: "Job completed",
+      at: job.updatedAt,
+    });
 
     return job;
   }
 }
 
-export const jobRepository: JobRepository = new InMemoryJobRepository();
+function statusMessage(status: JobStatus): string {
+  const messages: Record<JobStatus, string> = {
+    queued: "Job queued for processing",
+    running: "Worker started processing",
+    completed: "Job completed",
+    failed: "Job failed",
+  };
+
+  return messages[status];
+}
+
+export const inMemoryJobRepository: JobRepository = new InMemoryJobRepository();

@@ -76,6 +76,18 @@ test("GET /api/jobs returns the sample jobs as JSON", async () => {
   );
 });
 
+test("GET /api/health reports local service readiness", async () => {
+  const response = await request("/api/health");
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), {
+    status: "ready",
+    storage: "memory",
+    queue: "configured",
+  });
+});
+
 test("GET /api/jobs/:id returns one job", async () => {
   const response = await request("/api/jobs/job_1042", {
     headers: { accept: "application/json" },
@@ -92,6 +104,13 @@ test("GET /api/jobs/:id returns one job", async () => {
     createdAt: "Just now",
     attempts: 1,
     failure: null,
+    progress: 45,
+    result: null,
+    updatedAt: "Just now",
+    history: [
+      { status: "queued", message: "Job accepted", at: "1 min ago" },
+      { status: "running", message: "Worker started processing", at: "Just now" },
+    ],
   });
 });
 
@@ -128,6 +147,12 @@ test("POST /api/jobs accepts a valid job submission", async () => {
     createdAt: body.createdAt,
     attempts: 0,
     failure: null,
+    progress: 0,
+    result: null,
+    updatedAt: body.createdAt,
+    history: [
+      { status: "queued", message: "Job accepted", at: body.createdAt },
+    ],
   });
   assert.equal(Number.isNaN(Date.parse(body.createdAt)), false);
   assert.deepEqual(queuedMessages, [
@@ -230,6 +255,41 @@ test("POST /api/jobs returns 503 when the queue is unavailable", async () => {
   });
 });
 
+test("POST /api/jobs requires the configured API key", async () => {
+  const submission = {
+    name: "Generate monthly invoice",
+    type: "invoice.generate",
+    payload: { customerId: "cust_secure" },
+  };
+  const unauthorized = await request(
+    "/api/jobs",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(submission),
+    },
+    { RELAY_API_KEY: "relay-test-key" },
+  );
+
+  assert.equal(unauthorized.status, 401);
+  assert.equal(unauthorized.headers.get("www-authenticate"), "Bearer");
+
+  const authorized = await request(
+    "/api/jobs",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer relay-test-key",
+      },
+      body: JSON.stringify(submission),
+    },
+    { RELAY_API_KEY: "relay-test-key" },
+  );
+
+  assert.equal(authorized.status, 201);
+});
+
 test("queue consumer completes and acknowledges a supported job", async () => {
   queuedMessages.length = 0;
 
@@ -268,6 +328,13 @@ test("queue consumer completes and acknowledges a supported job", async () => {
   assert.equal(retried, false);
   assert.equal(completedJob.status, "completed");
   assert.equal(completedJob.attempts, 1);
+  assert.equal(completedJob.progress, 100);
+  assert.deepEqual(completedJob.result, {
+    fileName: "customers-october.csv",
+    imported: 0,
+    skipped: 0,
+  });
+  assert.equal(completedJob.history.at(-1).status, "completed");
 });
 
 test("queue consumer records and acknowledges a permanent failure", async () => {

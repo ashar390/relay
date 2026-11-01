@@ -9,6 +9,12 @@ export type JobFailure = {
   occurredAt: string;
 };
 
+export type JobEvent = {
+  status: JobStatus;
+  message: string;
+  at: string;
+};
+
 export type Job = {
   id: string;
   name: string;
@@ -18,6 +24,10 @@ export type Job = {
   createdAt: string;
   attempts: number;
   failure: JobFailure | null;
+  progress: number;
+  result: Record<string, unknown> | null;
+  updatedAt: string;
+  history: JobEvent[];
 };
 
 export type CreateJobInput = {
@@ -27,14 +37,20 @@ export type CreateJobInput = {
 };
 
 export function createJob(input: CreateJobInput): Job {
+  const now = new Date().toISOString();
+
   return {
     id: `job_${crypto.randomUUID()}`,
     name: input.name,
     type: input.type,
     payload: input.payload,
     status: "queued",
-    createdAt: new Date().toISOString(),
+    createdAt: now,
     attempts: 0,
     failure: null,
+    progress: 0,
+    result: null,
+    updatedAt: now,
+    history: [{ status: "queued", message: "Job accepted", at: now }],
   };
 }

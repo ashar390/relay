@@ -1,5 +1,6 @@
 import type { JobQueueMessage } from "./job-queue";
-import { jobRepository } from "./job-repository";
+import { JobHandlerError, runJobHandler } from "./job-handlers";
+import { getJobRepository } from "./repository-provider";
 
 const RETRY_DELAY_SECONDS = 30;
 
@@ -14,9 +15,10 @@ export type JobMessageBatch = {
 };
 
 export async function consumeJobBatch(batch: JobMessageBatch): Promise<void> {
+  const jobRepository = getJobRepository();
   for (const message of batch.messages) {
     try {
-      await processJob(message.body);
+      await processJob(message.body, jobRepository);
       message.ack();
     } catch (error) {
       const failure = describeFailure(error);
@@ -34,7 +36,10 @@ export async function consumeJobBatch(batch: JobMessageBatch): Promise<void> {
   }
 }
 
-async function processJob(message: JobQueueMessage): Promise<void> {
+async function processJob(
+  message: JobQueueMessage,
+  jobRepository: ReturnType<typeof getJobRepository>,
+): Promise<void> {
   const job = await jobRepository.updateStatus(message.id, "running");
 
   if (!job) {
@@ -45,38 +50,9 @@ async function processJob(message: JobQueueMessage): Promise<void> {
     );
   }
 
-  validateSupportedPayload(message);
-  await jobRepository.updateStatus(message.id, "completed");
-}
-
-function validateSupportedPayload(message: JobQueueMessage): void {
-  const requiredFields: Record<string, string> = {
-    "customers.import": "fileName",
-    "csv.validate": "fileName",
-    "report.generate": "importId",
-    "email.send": "importId",
-    "invoice.generate": "customerId",
-  };
-  const requiredField = requiredFields[message.type];
-
-  if (!requiredField) {
-    throw new JobProcessingError(
-      "UNSUPPORTED_JOB_TYPE",
-      `No handler is registered for ${message.type}`,
-      false,
-    );
-  }
-
-  if (
-    typeof message.payload[requiredField] !== "string" ||
-    message.payload[requiredField].trim().length === 0
-  ) {
-    throw new JobProcessingError(
-      "INVALID_JOB_PAYLOAD",
-      `${message.type} requires payload.${requiredField}`,
-      false,
-    );
-  }
+  await jobRepository.updateProgress(message.id, 50, "Handler processing payload");
+  const result = await runJobHandler(message);
+  await jobRepository.complete(message.id, result);
 }
 
 class JobProcessingError extends Error {
@@ -95,7 +71,7 @@ function describeFailure(error: unknown): {
   message: string;
   retryable: boolean;
 } {
-  if (error instanceof JobProcessingError) {
+  if (error instanceof JobProcessingError || error instanceof JobHandlerError) {
     return {
       code: error.code,
       message: error.message,
