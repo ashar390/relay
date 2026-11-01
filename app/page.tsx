@@ -1,5 +1,5 @@
-import { JobList } from "./components/job-list";
-import { jobRepository } from "./lib/job-repository";
+import { JobDashboard } from "./components/job-dashboard";
+import { getJobRepository } from "./lib/repository-provider";
 
 const stages = [
   { number: "01", title: "Submit", copy: "A website sends Relay a slow task." },
@@ -9,6 +9,7 @@ const stages = [
 ];
 
 export default async function Home() {
+  const jobRepository = getJobRepository();
   const jobs = await jobRepository.list();
 
   return (
@@ -37,7 +38,7 @@ export default async function Home() {
 
       <section className="flow" aria-labelledby="flow-title">
         <div className="section-heading">
-          <span>How it will work</span>
+          <span>How it works</span>
           <h2 id="flow-title">One job, four simple steps.</h2>
         </div>
         <div className="stage-grid">
@@ -58,16 +59,16 @@ export default async function Home() {
             <h2 id="dashboard-title">Know what every job is doing.</h2>
           </div>
           <p className="dashboard-note">
-            Sample data for the first dashboard iteration. Live queue data comes next.
+            Filter live jobs, inspect each execution, and safely replay failures.
           </p>
         </div>
-        <JobList jobs={jobs} />
+        <JobDashboard initialJobs={jobs} />
       </section>
 
       <section className="promise" aria-labelledby="promise-title">
         <p className="label">What makes Relay different</p>
         <h2 id="promise-title">Most tools tell you a job failed.</h2>
-        <p className="accent-copy">Relay will help you understand why—and safely try again.</p>
+        <p className="accent-copy">Relay helps you understand why—and safely try again.</p>
         <div className="product-note">
           <span className="dot" />
           <p><strong>Built for the difficult moments:</strong> timeouts, invalid data, crashed workers, and jobs that need a careful second attempt.</p>

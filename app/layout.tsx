@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Relay — Background work, made understandable",
-  description: "A failure-aware background job platform built in public, one explainable step at a time.",
+  description: "A failure-aware platform for processing, monitoring, and recovering background jobs.",
 };
 
 export default function RootLayout({

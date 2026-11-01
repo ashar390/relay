@@ -2,9 +2,11 @@ import type { Job } from "../lib/jobs";
 
 type JobListProps = {
   jobs: Job[];
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
 };
 
-export function JobList({ jobs }: JobListProps) {
+export function JobList({ jobs, selectedId, onSelect }: JobListProps) {
   return (
     <div className="job-table" role="table" aria-label="Background jobs">
       <div className="job-row job-header" role="row">
@@ -15,9 +17,19 @@ export function JobList({ jobs }: JobListProps) {
       </div>
 
       {jobs.map((job) => (
-        <div className="job-row" role="row" key={job.id}>
+        <div
+          className={`job-row${selectedId === job.id ? " job-row-selected" : ""}`}
+          role="row"
+          key={job.id}
+        >
           <div className="job-identity" role="cell">
-            <strong>{job.name}</strong>
+            {onSelect ? (
+              <button type="button" onClick={() => onSelect(job.id)}>
+                {job.name}
+              </button>
+            ) : (
+              <strong>{job.name}</strong>
+            )}
             <span>{job.id}</span>
           </div>
           <span className={`status-badge status-${job.status}`} role="cell">
