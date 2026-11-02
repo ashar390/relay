@@ -82,14 +82,14 @@ export class PostgresJobRepository implements JobRepository {
       job.id,
       job.name,
       job.type,
-      JSON.stringify(job.payload),
+      job.payload,
       job.status,
       job.createdAt,
       job.attempts,
       job.progress,
-      JSON.stringify(job.result),
+      job.result,
       job.updatedAt,
-      JSON.stringify(job.history),
+      job.history,
     ]);
 
     return toJob(row);
@@ -106,18 +106,30 @@ export class PostgresJobRepository implements JobRepository {
     const [row] = await this.database.query<JobRow>(`
       UPDATE jobs
       SET
-        status = $2,
-        attempts = attempts + CASE WHEN $2 = 'running' THEN 1 ELSE 0 END,
+        status = $2::job_status,
+        attempts = attempts + CASE
+          WHEN $2::job_status = 'running'::job_status THEN 1
+          ELSE 0
+        END,
         updated_at = CURRENT_TIMESTAMP,
-        failure = CASE WHEN $2 = 'failed' THEN failure ELSE NULL END,
-        progress = CASE WHEN $2 = 'queued' THEN 0 ELSE progress END,
-        result = CASE WHEN $2 = 'queued' THEN NULL ELSE result END,
+        failure = CASE
+          WHEN $2::job_status = 'failed'::job_status THEN failure
+          ELSE NULL
+        END,
+        progress = CASE
+          WHEN $2::job_status = 'queued'::job_status THEN 0
+          ELSE progress
+        END,
+        result = CASE
+          WHEN $2::job_status = 'queued'::job_status THEN NULL
+          ELSE result
+        END,
         history = history || jsonb_build_array(jsonb_build_object(
-          'status', $2,
-          'message', CASE $2
-            WHEN 'queued' THEN 'Job queued for processing'
-            WHEN 'running' THEN 'Worker started processing'
-            WHEN 'completed' THEN 'Job completed'
+          'status', $2::text,
+          'message', CASE $2::job_status
+            WHEN 'queued'::job_status THEN 'Job queued for processing'
+            WHEN 'running'::job_status THEN 'Worker started processing'
+            WHEN 'completed'::job_status THEN 'Job completed'
             ELSE 'Job failed'
           END,
           'at', CURRENT_TIMESTAMP
@@ -142,13 +154,13 @@ export class PostgresJobRepository implements JobRepository {
         updated_at = CURRENT_TIMESTAMP,
         history = history || jsonb_build_array(jsonb_build_object(
           'status', 'failed',
-          'message', $3,
+          'message', $3::text,
           'at', CURRENT_TIMESTAMP
         ))
       WHERE id = $1
       RETURNING id, name, type, payload, status, created_at, attempts, failure,
                 progress, result, updated_at, history
-    `, [id, JSON.stringify(failure), failure.message]);
+    `, [id, failure, failure.message]);
 
     return row ? toJob(row) : undefined;
   }
@@ -166,7 +178,7 @@ export class PostgresJobRepository implements JobRepository {
         updated_at = CURRENT_TIMESTAMP,
         history = history || jsonb_build_array(jsonb_build_object(
           'status', 'running',
-          'message', $3,
+          'message', $3::text,
           'at', CURRENT_TIMESTAMP
         ))
       WHERE id = $1
@@ -197,7 +209,7 @@ export class PostgresJobRepository implements JobRepository {
       WHERE id = $1
       RETURNING id, name, type, payload, status, created_at, attempts, failure,
                 progress, result, updated_at, history
-    `, [id, JSON.stringify(result)]);
+    `, [id, result]);
 
     return row ? toJob(row) : undefined;
   }
