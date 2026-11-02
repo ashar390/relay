@@ -138,9 +138,9 @@ export function JobDashboard({ initialJobs }: JobDashboardProps) {
               <span className="label">Selected job</span>
               <h3 id="job-details-title">{selectedJob.name}</h3>
             </div>
-            {selectedJob.status === "failed" ? (
+            {selectedJob.status === "failed" || selectedJob.status === "queued" ? (
               <button type="button" onClick={() => retryJob(selectedJob)}>
-                Retry job
+                {selectedJob.status === "queued" ? "Requeue job" : "Retry job"}
               </button>
             ) : null}
           </div>

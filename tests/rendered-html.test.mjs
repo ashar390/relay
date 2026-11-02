@@ -466,10 +466,30 @@ test("POST /api/jobs/:id/retry rejects a job that has not failed", async () => {
 
   assert.equal(response.status, 409);
   assert.deepEqual(await response.json(), {
-    error: "Only failed jobs can be retried",
+    error: "Only failed or queued jobs can be retried",
     jobId: "job_1042",
     status: "running",
   });
+});
+
+test("POST /api/jobs/:id/retry requeues a stalled queued job", async () => {
+  queuedMessages.length = 0;
+
+  const response = await request("/api/jobs/job_1041/retry", {
+    method: "POST",
+  });
+
+  assert.equal(response.status, 202);
+  const retriedJob = await response.json();
+  assert.equal(retriedJob.status, "queued");
+  assert.deepEqual(queuedMessages, [
+    {
+      id: "job_1041",
+      type: "report.generate",
+      payload: { importId: "import_204" },
+      createdAt: "2 min ago",
+    },
+  ]);
 });
 
 test("GET /api/jobs/:id returns 404 for an unknown job", async () => {

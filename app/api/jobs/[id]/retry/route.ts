@@ -27,10 +27,10 @@ export async function POST(request: Request, { params }: RetryJobRouteContext) {
     );
   }
 
-  if (job.status !== "failed" || !job.failure) {
+  if (job.status !== "failed" && job.status !== "queued") {
     return Response.json(
       {
-        error: "Only failed jobs can be retried",
+        error: "Only failed or queued jobs can be retried",
         jobId: id,
         status: job.status,
       },
@@ -51,7 +51,15 @@ export async function POST(request: Request, { params }: RetryJobRouteContext) {
   try {
     await enqueueJob(queuedJob);
   } catch {
-    await jobRepository.markFailed(id, previousFailure);
+    await jobRepository.markFailed(
+      id,
+      previousFailure ?? {
+        code: "JOB_RETRY_QUEUE_ERROR",
+        message: "Job could not be queued for retry",
+        retryable: true,
+        occurredAt: new Date().toISOString(),
+      },
+    );
 
     return Response.json(
       { error: "Job could not be queued for retry" },
